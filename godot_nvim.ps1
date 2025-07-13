@@ -5,17 +5,25 @@ Start-Transcript -Path "$env:TEMP\godot_nvim_log.txt" -Append
 [string]$Line = $args[1]
 [string]$Col = $args[2]
 
-$ScriptFile = $ScriptFile.Trim()
+# Normalize the path to be safe (replace \ with /)
+$ScriptFile = $ScriptFile.Trim() -replace '\\', '/'
 
-# Extract the relative WSL path from the UNC path
+# Try to handle WSL UNC paths
 if ($ScriptFile -match "wsl\.localhost/([^/]+)/(.+)") {
     $distro = $matches[1]
     $path = $matches[2]
     $wslPath = "/" + $path
-} elseif ($ScriptFile -like "\\wsl.localhost\*") {
-    $parts = $ScriptFile -split "\\"
-    $wslPath = "/" + ($parts[4..($parts.Length - 1)] -join "/")
-} else {
+}
+# Handle local Windows paths (e.g., C:/Users/...)
+elseif ($ScriptFile -match "^[A-Za-z]:/") {
+    try {
+        $wslPath = wsl wslpath -a "$ScriptFile"
+    } catch {
+        Write-Error "Failed to convert Windows path: $ScriptFile"
+        exit 1
+    }
+}
+else {
     Write-Error "Unexpected path: $ScriptFile"
     exit 1
 }

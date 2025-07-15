@@ -40,7 +40,7 @@ $headlessRunning = wsl -e bash -c "pgrep -f 'nvim --listen 127.0.0.1:55555'" 2>$
 if (-not $headlessRunning) {
     Write-Host "Starting headless nvim server in WSL..."
     # wsl -d Ubuntu -- bash -c "nohup setsid /opt/nvim-linux-x86_64/bin//nvim --listen 127.0.0.1:55555 --headless >/dev/null 2>&1 < /dev/null &"
-    wsl -d Ubuntu -- tmux new-session -d -s nvim_server /opt/nvim-linux-x86_64/bin/nvim --listen 127.0.0.1:55555 --headless
+    wsl -d Ubuntu -- tmux new-session -d -s nvim_server /opt/nvim-linux-x86_64/bin/nvim --listen 127.0.0.1:55555 --headless --cmd 'let g:neovide = 1'
 
     # Wait for nvim to start listening
     $maxWait = 10  # seconds

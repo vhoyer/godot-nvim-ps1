@@ -113,7 +113,7 @@ public class WinAPI {
 }
 
 # Send command to nvim
-$remoteCmd = "<Esc>:e $wslPath<CR>:call cursor($Line,$Col)<CR>"
+$remoteCmd = "<C-\><C-n>:e $wslPath<CR>:call cursor($Line,$Col)<CR>"
 & nvim --server 127.0.0.1:55555 --remote-send $remoteCmd
 
 Stop-Transcript

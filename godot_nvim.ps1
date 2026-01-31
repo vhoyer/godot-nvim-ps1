@@ -88,15 +88,30 @@ if (-not $headlessRunning) {
     }
 }
 
+# Create a temporary wrapper script in WSL /tmp to load user environment
+Write-Host "Creating wrapper script in /tmp..."
+wsl -e zsh -c "printf '#!/usr/bin/env zsh\n[ -f ~/.zprofile ] && source ~/.zprofile\n[ -f ~/.zshrc ] && source ~/.zshrc\nexec nvim --server 127.0.0.1:55555 --remote-ui\n' > /tmp/godot-nvim-client.sh && chmod +x /tmp/godot-nvim-client.sh"
 
-# Check if Neovide is already running
-$neovideRunning = Get-Process -Name "neovide" -ErrorAction SilentlyContinue
+# Check if nvim UI client is connected to the headless server
+$nvimClientRunning = wsl -e bash -c "pgrep -f 'nvim.*--server.*127.0.0.1:55555.*--remote-ui'" 2>$null
 
-if (-not $neovideRunning) {
-    Write-Host "Starting Neovide..."
-    Start-Process "neovide.exe" -ArgumentList "--server", "127.0.0.1:55555"
+# Check if Windows Terminal is running
+$terminalRunning = Get-Process -Name "WindowsTerminal" -ErrorAction SilentlyContinue
+
+if (-not $nvimClientRunning) {
+    # Nvim client is not running, need to start it
+    if (-not $terminalRunning) {
+        Write-Host "Starting Windows Terminal with nvim client..."
+        Start-Process "wt.exe" -ArgumentList "wsl", "zsh", "-l", "/tmp/godot-nvim-client.sh"
+    } else {
+        Write-Host "Opening new tab in Terminal with nvim client..."
+        Start-Process "wt.exe" -ArgumentList "-w", "0", "new-tab", "wsl", "zsh", "-l", "/tmp/godot-nvim-client.sh"
+    }
 } else {
-    # Bring existing Neovide window to front
+    # Nvim client is already running, just bring Terminal to front
+    Write-Host "Focusing existing Terminal with nvim client..."
+
+    # Keep Win32 API code for SetForegroundWindow
     Add-Type @"
 using System;
 using System.Runtime.InteropServices;
@@ -108,8 +123,8 @@ public class WinAPI {
 }
 "@
 
-    $neovideProc = $neovideRunning | Select-Object -First 1
-    [WinAPI]::SetForegroundWindow($neovideProc.MainWindowHandle) | Out-Null
+    $terminalProc = $terminalRunning | Select-Object -First 1
+    [WinAPI]::SetForegroundWindow($terminalProc.MainWindowHandle) | Out-Null
 }
 
 # Send command to nvim

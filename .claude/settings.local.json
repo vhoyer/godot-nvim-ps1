@@ -4,7 +4,11 @@
       "WebSearch",
       "WebFetch(domain:ss64.com)",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:docs.godotengine.org)"
+      "WebFetch(domain:docs.godotengine.org)",
+      "Bash(find:*)",
+      "WebFetch(domain:neovim.io)",
+      "WebFetch(domain:neovim.discourse.group)",
+      "Bash(tmux kill-session:*)"
     ]
   }
 }

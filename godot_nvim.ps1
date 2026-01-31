@@ -102,10 +102,10 @@ if (-not $nvimClientRunning) {
     # Nvim client is not running, need to start it
     if (-not $terminalRunning) {
         Write-Host "Starting Windows Terminal with nvim client..."
-        Start-Process "wt.exe" -ArgumentList "wsl", "zsh", "-l", "/tmp/godot-nvim-client.sh"
+        Start-Process "wt.exe" -ArgumentList "-p", "Ubuntu", "wsl", "zsh", "-l", "/tmp/godot-nvim-client.sh"
     } else {
         Write-Host "Opening new tab in Terminal with nvim client..."
-        Start-Process "wt.exe" -ArgumentList "-w", "0", "new-tab", "wsl", "zsh", "-l", "/tmp/godot-nvim-client.sh"
+        Start-Process "wt.exe" -ArgumentList "-w", "0", "new-tab", "-p", "Ubuntu", "wsl", "zsh", "-l", "/tmp/godot-nvim-client.sh"
     }
 } else {
     # Nvim client is already running, just bring Terminal to front

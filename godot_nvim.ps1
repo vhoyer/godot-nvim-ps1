@@ -9,28 +9,47 @@ Start-Transcript -Path "$env:TEMP\godot_nvim_log.txt" -Append
 function Get-GodotProjectRoot {
     param([string]$filePath)
 
+    # Normalize to Unix-style path
+    $filePath = $filePath -replace '\\', '/'
+
     # Start from the file's directory
     $currentDir = Split-Path -Parent $filePath
+    $currentDir = $currentDir -replace '\\', '/'
+
+    Write-Host "Starting search from: $currentDir"
 
     # Walk up the directory tree looking for project.godot
     while ($currentDir -and $currentDir -ne "/" -and $currentDir -ne "") {
-        $projectFile = Join-Path $currentDir "project.godot"
-        $checkCmd = "wsl -e bash -c `"test -f '$projectFile' && echo 'found' || echo 'notfound'`""
-        $result = Invoke-Expression $checkCmd 2>$null
+        # Use Unix-style path concatenation
+        $projectFile = "$currentDir/project.godot"
 
-        if ($result -match "found") {
+        Write-Host "Checking: $projectFile"
+
+        # Call WSL directly with argument array (avoids quoting issues)
+        $result = & wsl -e test -f $projectFile
+        $exitCode = $LASTEXITCODE
+
+        Write-Host "  Exit code: $exitCode"
+
+        if ($exitCode -eq 0) {
+            Write-Host "  FOUND!"
             return $currentDir
         }
 
         $currentDir = Split-Path -Parent $currentDir
+        $currentDir = $currentDir -replace '\\', '/'
     }
 
+    Write-Host "Not found, using fallback"
+
     # Fallback: use the file's parent directory
-    return Split-Path -Parent $filePath
+    $fallback = Split-Path -Parent $filePath
+    return $fallback -replace '\\', '/'
 }
 
 function Get-ProjectName {
     param([string]$projectPath)
+    # Return the directory name where project.godot is located
     return Split-Path -Leaf $projectPath
 }
 

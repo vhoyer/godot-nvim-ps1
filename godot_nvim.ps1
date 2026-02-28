@@ -180,29 +180,41 @@ if ($scriptExists -notmatch "exists") {
 
 Write-Host "Wrapper script created successfully at $wrapperScript"
 
-# Check if nvim UI client is connected to THIS project's server
-$nvimClientRunning = wsl -e bash -c "pgrep -f 'nvim.*--server.*$serverAddress.*--remote-ui'" 2>$null
+# Lock mechanism: prevent multiple rapid invocations from opening duplicate tabs.
+# mkdir is atomic on Linux, making it a reliable lock primitive.
+$lockDir = "/tmp/godot-nvim-tab-lock-$projectName"
 
-# Check if Windows Terminal is running
-$terminalRunning = Get-Process -Name "WindowsTerminal" -ErrorAction SilentlyContinue
+# Remove stale lock older than 30 seconds (handles crashes/unexpected exits)
+wsl -e bash -c "find '$lockDir' -maxdepth 0 -mmin +0.5 -exec rmdir '{}' \; 2>/dev/null"
 
-if (-not $nvimClientRunning) {
-    $titleArg = "gd:$projectName"
+$lockAcquired = (wsl -e bash -c "mkdir '$lockDir' 2>/dev/null && echo 'yes' || echo 'no'").Trim()
 
-    # Nvim client is not running, need to start it
-    if (-not $terminalRunning) {
-        Write-Host "Starting Windows Terminal with nvim client for '$projectName'..."
-        Start-Process "wt.exe" -ArgumentList "-p", "Ubuntu", "--title", $titleArg, "--", "wsl", "-d", "Ubuntu", "zsh", "-l", "$wrapperScript"
+if ($lockAcquired -eq "yes") {
+    Write-Host "Lock acquired for '$projectName'"
+
+    # Check if nvim UI client is connected to THIS project's server
+    $nvimClientRunning = wsl -e bash -c "pgrep -f 'nvim.*--server.*$serverAddress.*--remote-ui'" 2>$null
+
+    # Check if Windows Terminal is running
+    $terminalRunning = Get-Process -Name "WindowsTerminal" -ErrorAction SilentlyContinue
+
+    if (-not $nvimClientRunning) {
+        $titleArg = "gd:$projectName"
+
+        # Nvim client is not running, need to start it
+        if (-not $terminalRunning) {
+            Write-Host "Starting Windows Terminal with nvim client for '$projectName'..."
+            Start-Process "wt.exe" -ArgumentList "-p", "Ubuntu", "--title", $titleArg, "--", "wsl", "-d", "Ubuntu", "zsh", "-l", "$wrapperScript"
+        } else {
+            Write-Host "Opening new tab in Terminal for '$projectName'..."
+            Start-Process "wt.exe" -ArgumentList "-w", "0", "new-tab", "-p", "Ubuntu", "--title", $titleArg, "--", "wsl", "-d", "Ubuntu", "zsh", "-l", "$wrapperScript"
+        }
     } else {
-        Write-Host "Opening new tab in Terminal for '$projectName'..."
-        Start-Process "wt.exe" -ArgumentList "-w", "0", "new-tab", "-p", "Ubuntu", "--title", $titleArg, "--", "wsl", "-d", "Ubuntu", "zsh", "-l", "$wrapperScript"
-    }
-} else {
-    # Nvim client is already running, just bring Terminal to front
-    Write-Host "Client for '$projectName' already running, bringing Terminal to front..."
+        # Nvim client is already running, just bring Terminal to front
+        Write-Host "Client for '$projectName' already running, bringing Terminal to front..."
 
-    # Keep Win32 API code for SetForegroundWindow
-    Add-Type @"
+        # Keep Win32 API code for SetForegroundWindow
+        Add-Type @"
 using System;
 using System.Runtime.InteropServices;
 
@@ -213,8 +225,14 @@ public class WinAPI {
 }
 "@
 
-    $terminalProc = $terminalRunning | Select-Object -First 1
-    [WinAPI]::SetForegroundWindow($terminalProc.MainWindowHandle) | Out-Null
+        $terminalProc = $terminalRunning | Select-Object -First 1
+        [WinAPI]::SetForegroundWindow($terminalProc.MainWindowHandle) | Out-Null
+    }
+
+    # Release the lock
+    wsl -e bash -c "rmdir '$lockDir' 2>/dev/null"
+} else {
+    Write-Host "Tab open already in progress for '$projectName' (lock held), skipping..."
 }
 
 # Send command to the project-specific nvim server
